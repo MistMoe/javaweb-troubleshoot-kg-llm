@@ -1,0 +1,30 @@
+server:
+  port: 8088
+
+spring:
+  application:
+    name: javaweb-troubleshoot-backend
+  datasource:
+    url: jdbc:mysql://localhost:3306/troubleshoot_kg?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
+    username: root
+    password: REPLACE_WITH_LOCAL_MYSQL_PASSWORD
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  neo4j:
+    uri: bolt://127.0.0.1:7687
+    authentication:
+      username: neo4j
+      password: root123456
+
+llm:
+  enabled: false
+  provider: deepseek
+  api-url: https://api.deepseek.com/chat/completions
+  api-key: ${LLM_API_KEY:REPLACE_WITH_LLM_API_KEY}
+  model: deepseek-chat
+
+neo4j:
+  uri: bolt://127.0.0.1:7687
+  http-url: http://127.0.0.1:7474/db/neo4j/tx/commit
+  username: neo4j
+  password: REPLACE_WITH_NEO4J_PASSWORD
+  database: neo4j

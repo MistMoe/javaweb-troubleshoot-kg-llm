@@ -1,0 +1,588 @@
+.dashboard-view {
+  position: relative;
+  min-width: 0;
+  min-height: 100%;
+  color: var(--text-primary);
+}
+
+.dashboard-view .workspace-mosaic {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-areas:
+    "overview overview overview overview overview overview overview overview overview overview overview overview"
+    "trend trend trend trend trend trend trend services services services services services"
+    "records records records records records records records distribution distribution distribution distribution distribution";
+  gap: 28px;
+  width: 100%;
+  min-width: 0;
+  padding-bottom: 88px;
+}
+
+.dashboard-view .tile {
+  min-width: 0;
+  padding: 30px;
+  overflow: hidden;
+}
+
+.dashboard-view .overview-tile {
+  display: flex;
+  grid-area: overview;
+  gap: 28px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 142px;
+  padding: 28px 32px;
+}
+
+.dashboard-view .overview-copy,
+.dashboard-view .tile-heading > div {
+  min-width: 0;
+}
+
+.dashboard-view .overview-copy {
+  display: grid;
+  gap: 5px;
+}
+
+.dashboard-view .eyebrow,
+.dashboard-view h1,
+.dashboard-view h2,
+.dashboard-view p {
+  margin: 0;
+}
+
+.dashboard-view .eyebrow {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+}
+
+.dashboard-view h1 {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: clamp(27px, 2.7vw, 38px);
+  line-height: 1.12;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-view h2 {
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 780;
+}
+
+.dashboard-view .overview-copy > p:last-child {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.dashboard-view .status-plates {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(130px, 1fr));
+  gap: 16px;
+  width: min(600px, 56%);
+}
+
+.dashboard-view .status-plate {
+  display: grid;
+  grid-template-columns: 9px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  padding: 13px 15px;
+}
+
+.dashboard-view .status-plate > i {
+  width: 8px;
+  height: 8px;
+  background: var(--accent-blue);
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(79, 134, 232, 0.11);
+}
+
+.dashboard-view .status-plate--violet > i {
+  background: var(--accent-violet);
+  box-shadow: 0 0 0 4px rgba(150, 137, 230, 0.11);
+}
+
+.dashboard-view .status-plate--cyan > i {
+  background: var(--accent-cyan);
+  box-shadow: 0 0 0 4px rgba(98, 185, 202, 0.11);
+}
+
+.dashboard-view .status-plate > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dashboard-view .status-plate strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-view .status-plate small {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.dashboard-view .trend-tile {
+  grid-area: trend;
+  min-height: 520px;
+}
+
+.dashboard-view .service-tile {
+  display: grid;
+  grid-area: services;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  min-height: 520px;
+}
+
+.dashboard-view .records-tile {
+  grid-area: records;
+  min-height: 420px;
+}
+
+.dashboard-view .distribution-tile {
+  grid-area: distribution;
+  min-height: 420px;
+}
+
+.dashboard-view .tile-heading {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  color: var(--text-secondary);
+}
+
+.dashboard-view .tile-heading.compact {
+  margin-bottom: 20px;
+}
+
+.dashboard-view .tile-heading > div:first-child {
+  display: grid;
+  gap: 5px;
+}
+
+.dashboard-view .heading-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--accent-blue);
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.dashboard-view .trend-tile .tile-heading > svg,
+.dashboard-view .trend-tile .heading-meta {
+  color: var(--accent-blue);
+}
+
+.dashboard-view .connection-section .tile-heading > svg {
+  color: var(--accent-cyan);
+}
+
+.dashboard-view .llm-section .tile-heading > svg,
+.dashboard-view .distribution-tile .tile-heading > svg {
+  color: var(--accent-violet);
+}
+
+.dashboard-view .trend-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 30px;
+  align-items: stretch;
+  margin-top: 26px;
+}
+
+.dashboard-view .chart-frame {
+  height: 380px;
+  min-height: 380px;
+  padding: 18px 18px 12px;
+}
+
+.dashboard-view .trend-chart,
+.dashboard-view .status-chart {
+  width: 100%;
+  height: 100%;
+}
+
+.dashboard-view .distribution-chart {
+  width: 100%;
+  min-height: 300px;
+}
+
+.dashboard-view .daily-focus {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
+.dashboard-view .status-ring {
+  position: relative;
+  display: grid;
+  width: 180px;
+  height: 180px;
+  place-items: center;
+  justify-self: center;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+.dashboard-view .status-ring .status-chart {
+  position: absolute;
+  inset: 0;
+}
+
+.dashboard-view .ring-inner {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  width: 104px;
+  height: 104px;
+  color: var(--text-muted);
+  background: rgba(247, 250, 253, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 50%;
+  box-shadow:
+    inset 2px 2px 7px rgba(118, 143, 169, 0.13),
+    inset -3px -3px 8px rgba(255, 255, 255, 0.78);
+}
+
+.dashboard-view .ring-inner strong {
+  color: var(--text-primary);
+  font-size: 29px;
+  line-height: 1;
+}
+
+.dashboard-view .ring-inner span {
+  margin-top: 6px;
+  font-size: 10px;
+}
+
+.dashboard-view .focus-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.dashboard-view .focus-metrics > span {
+  display: grid;
+  gap: 3px;
+  padding: 12px 13px;
+}
+
+.dashboard-view .focus-metrics strong {
+  color: var(--text-primary);
+  font-size: 18px;
+}
+
+.dashboard-view .focus-metrics small {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.dashboard-view .daily-focus .action-button {
+  width: 100%;
+}
+
+.dashboard-view .service-section {
+  min-width: 0;
+}
+
+.dashboard-view .service-section + .service-section {
+  padding-top: 26px;
+  margin-top: 26px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.dashboard-view .status-list {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.dashboard-view .status-list li {
+  display: grid;
+  grid-template-columns: 11px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  padding: 12px 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  background: rgba(232, 240, 247, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-inset);
+}
+
+.dashboard-view .status-list i,
+.dashboard-view .service-note i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.dashboard-view .status-list i.blue { background: var(--accent-blue); }
+.dashboard-view .status-list i.cyan { background: var(--accent-cyan); }
+.dashboard-view .status-list i.violet { background: var(--accent-violet); }
+.dashboard-view .status-list i.mint { background: var(--accent-mint); }
+
+.dashboard-view .status-list small {
+  color: var(--text-muted);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.dashboard-view .llm-grid {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px 18px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.dashboard-view .llm-grid strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-view .llm-grid .ready-text {
+  color: var(--accent-mint);
+}
+
+.dashboard-view .service-note {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  margin-top: 18px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.dashboard-view .service-note i {
+  background: var(--accent-mint);
+  box-shadow: 0 0 0 4px rgba(104, 185, 154, 0.1);
+}
+
+.dashboard-view .inline-link {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  width: fit-content;
+  padding: 0;
+  color: var(--accent-blue);
+  font-size: 12px;
+  font-weight: 760;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.dashboard-view .inline-link:hover {
+  color: #356fce;
+}
+
+.dashboard-view .record-list {
+  display: grid;
+  gap: 0;
+  padding: 10px 16px;
+  margin-top: 24px;
+  overflow: hidden;
+}
+
+.dashboard-view .record-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px 70px;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 16px 10px;
+  color: var(--text-secondary);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(139, 164, 191, 0.18);
+  cursor: pointer;
+  transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.dashboard-view .record-row:last-child {
+  border-bottom: 0;
+}
+
+.dashboard-view .record-row:hover {
+  color: var(--accent-blue);
+  background: rgba(238, 245, 252, 0.68);
+  box-shadow: inset 3px 0 0 var(--accent-blue);
+}
+
+.dashboard-view .record-row span {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-view .record-row small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.dashboard-view .record-row em {
+  font-size: 11px;
+  font-style: normal;
+  text-align: right;
+}
+
+.dashboard-view .record-row em.done { color: var(--accent-mint); }
+.dashboard-view .record-row em.pending { color: var(--accent-amber); }
+
+.dashboard-view .distribution-frame {
+  height: auto;
+  min-height: 340px;
+  margin: 24px 0 20px;
+  padding: 18px 18px 12px;
+}
+
+@media (max-width: 1180px) {
+  .dashboard-view .workspace-mosaic {
+    grid-template-areas:
+      "overview overview overview overview overview overview overview overview overview overview overview overview"
+      "trend trend trend trend trend trend trend trend services services services services"
+      "records records records records records records records distribution distribution distribution distribution distribution";
+  }
+
+  .dashboard-view .status-plates {
+    grid-template-columns: 1fr;
+    width: min(200px, 32%);
+  }
+
+  .dashboard-view .status-plate small {
+    display: none;
+  }
+
+  .dashboard-view .trend-layout {
+    grid-template-columns: minmax(0, 1fr) 200px;
+  }
+}
+
+@media (max-width: 980px) {
+  .dashboard-view .workspace-mosaic {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "overview"
+      "trend"
+      "services"
+      "records"
+      "distribution";
+  }
+
+  .dashboard-view .status-plates {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .dashboard-view .overview-tile {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dashboard-view .service-tile {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
+    gap: 20px;
+    min-height: auto;
+  }
+
+  .dashboard-view .service-section + .service-section {
+    padding-top: 0;
+    padding-left: 20px;
+    margin-top: 0;
+    border-top: 0;
+    border-left: 1px solid var(--line-soft);
+  }
+}
+
+@media (max-width: 720px) {
+  .dashboard-view .tile {
+    padding: 22px;
+  }
+
+  .dashboard-view .overview-tile {
+    padding: 22px;
+  }
+
+  .dashboard-view h1 {
+    font-size: 27px;
+    white-space: normal;
+  }
+
+  .dashboard-view .status-plates {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-view .status-plate small {
+    display: block;
+  }
+
+  .dashboard-view .trend-layout,
+  .dashboard-view .service-tile {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-view .daily-focus {
+    grid-template-columns: 152px minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .dashboard-view .status-ring {
+    grid-row: span 2;
+    width: 148px;
+    height: 148px;
+  }
+
+  .dashboard-view .daily-focus .action-button {
+    align-self: end;
+  }
+
+  .dashboard-view .service-section + .service-section {
+    padding-top: 18px;
+    padding-left: 0;
+    margin-top: 18px;
+    border-top: 1px solid var(--line-soft);
+    border-left: 0;
+  }
+
+  .dashboard-view .record-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .dashboard-view .record-row small {
+    display: none;
+  }
+}
+
+@media (max-width: 500px) {
+  .dashboard-view .daily-focus {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-view .status-ring {
+    grid-row: auto;
+  }
+}

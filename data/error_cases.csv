@@ -1,0 +1,4 @@
+error_name,stage,component,keyword,symptom,cause,solution,related_file,related_command,risk_tip
+端口被占用,后端启动,Spring Boot,"Port 8080 already in use;Web server failed to start",Spring Boot 启动失败提示端口已被占用,默认端口 8080 已被其他进程占用,关闭占用进程或修改 server.port,application.yml,netstat -ano | findstr 8080,结束进程前确认不是重要服务
+Maven 依赖无法解析,依赖管理,Maven,"Cannot resolve dependency;Could not find artifact",项目构建时无法下载或解析依赖,仓库配置错误或版本不存在,检查 pom.xml 和 settings.xml 并刷新 Maven,"pom.xml;settings.xml",mvn clean install -U,清理本地仓库前谨慎确认
+MySQL 连接失败,数据库连接,MySQL,"Communications link failure;Connection refused",后端无法连接 MySQL,服务未启动或端口地址错误,检查 MySQL 服务和 datasource 配置,application.yml,mysql -h localhost -P 3306 -u root -p,不要提交真实密码

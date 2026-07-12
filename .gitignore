@@ -1,0 +1,28 @@
+# Java / Maven
+target/
+*.class
+
+# Node / Vite
+node_modules/
+dist/
+.vite/
+
+# Local configuration
+.env
+*.local
+tools/
+backend/src/main/resources/application.yml
+
+# IDE
+.idea/
+.vscode/
+
+# Local backups and agent workspace state
+backups/
+.agents/
+.superpowers/
+docs/document-backups/
+
+# OS
+.DS_Store
+Thumbs.db
