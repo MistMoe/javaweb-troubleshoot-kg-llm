@@ -19,8 +19,17 @@ llm:
   enabled: false
   provider: deepseek
   api-url: https://api.deepseek.com/chat/completions
-  api-key: ${LLM_API_KEY:REPLACE_WITH_LLM_API_KEY}
+  api-key: ${LLM_API_KEY:}
   model: deepseek-chat
+
+# Independent OpenAI-compatible embedding service, e.g. local Ollama /v1 or a hosted provider.
+# Leave base-url empty to use keyword-only retrieval. DeepSeek chat is not an embedding endpoint.
+rag:
+  embedding:
+    base-url: ${EMBEDDING_BASE_URL:}
+    api-key: ${EMBEDDING_API_KEY:}
+    model: ${EMBEDDING_MODEL:BAAI/bge-m3}
+    min-score: 0.65
 
 neo4j:
   uri: bolt://127.0.0.1:7687
