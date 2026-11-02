@@ -1,136 +1,71 @@
 package com.mistmoe.troubleshoot.analyze;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Locale;
-import java.util.regex.Pattern;
-
 import com.mistmoe.troubleshoot.errorcase.ErrorCase;
-import com.mistmoe.troubleshoot.errorcase.ErrorCaseRepository;
 import com.mistmoe.troubleshoot.kg.GraphResponse;
 import com.mistmoe.troubleshoot.kg.KgService;
 import com.mistmoe.troubleshoot.llm.LlmAdviceService;
 import org.springframework.stereotype.Service;
+import java.util.List;
+import java.util.function.Consumer;
 
 @Service
 public class ErrorAnalysisService {
-
-    private static final Pattern PART_SPLITTER = Pattern.compile("[,;，；/]+");
-
-    private final ErrorCaseRepository errorCaseRepository;
-    private final KgService kgService;
-    private final AnalysisHistoryRepository historyRepository;
-    private final LlmAdviceService llmAdviceService;
-
-    public ErrorAnalysisService(ErrorCaseRepository errorCaseRepository, KgService kgService,
-                                AnalysisHistoryRepository historyRepository, LlmAdviceService llmAdviceService) {
-        this.errorCaseRepository = errorCaseRepository;
-        this.kgService = kgService;
-        this.historyRepository = historyRepository;
-        this.llmAdviceService = llmAdviceService;
+    public record Evidence(HybridCaseRetriever.Retrieval retrieval, ErrorCase best, GraphResponse graph, String graphStatus) {}
+    private final HybridCaseRetriever retriever;
+    private final KgService kg;
+    private final AnalysisHistoryRepository history;
+    private final LlmAdviceService llm;
+    public ErrorAnalysisService(HybridCaseRetriever retriever, KgService kg,
+            AnalysisHistoryRepository history, LlmAdviceService llm) {
+        this.retriever = retriever; this.kg = kg; this.history = history; this.llm = llm;
     }
-
-    public AnalyzeResponse analyze(AnalyzeRequest request) {
-        if (request.inputText() == null || request.inputText().trim().isEmpty()) {
+    public static void validate(AnalyzeRequest request) {
+        if (request == null || request.inputText() == null || request.inputText().isBlank())
             throw new IllegalArgumentException("请填写完整的错误日志或报错信息");
-        }
-
-        ErrorCase matchedCase = findBestMatch(request);
-        if (matchedCase == null) {
-            GraphResponse emptyGraph = new GraphResponse(List.of(), List.of());
-            String advice = "当前知识库未命中明确故障类型。请补充完整错误日志、技术栈版本、相关配置文件和复现步骤。";
-            historyRepository.save(request, null, null, emptyGraph, advice);
-            return new AnalyzeResponse(
-                    false,
-                    null,
-                    null,
-                    null,
-                    request.techStack(),
-                    List.of(),
-                    List.of(),
-                    List.of(),
-                    List.of(),
-                    List.of(),
-                    emptyGraph,
-                    advice,
-                    "未匹配到知识库中的故障案例，请补充更完整的报错文本、技术栈版本和关键配置。"
-            );
-        }
-
-        GraphResponse graph = kgService.graphByErrorId(matchedCase.id());
-        String advice = llmAdviceService.generateAdvice(request, matchedCase, graph);
-        historyRepository.save(request, matchedCase.id(), matchedCase.errorName(), graph, advice);
-        return new AnalyzeResponse(
-                true,
-                matchedCase.id(),
-                matchedCase.errorName(),
-                matchedCase.stage(),
-                matchedCase.component(),
-                splitParts(matchedCase.symptom()),
-                splitParts(matchedCase.cause()),
-                splitParts(matchedCase.solution()),
-                splitParts(matchedCase.relatedFile()),
-                splitParts(matchedCase.relatedCommand()),
-                graph,
-                advice,
-                "已根据错误关键字命中知识库案例，并检索 Neo4j 知识图谱。"
-        );
+        if (request.inputText().length() > 20000 || (request.techStack() != null && request.techStack().length() > 200))
+            throw new IllegalArgumentException("日志最多 20000 字，技术栈最多 200 字");
     }
-
-    private ErrorCase findBestMatch(AnalyzeRequest request) {
-        String input = normalize(request.inputText());
-        String techStack = normalize(request.techStack());
-        return errorCaseRepository.list(null, null, null).stream()
-                .map(item -> new ScoredErrorCase(item, score(item, input, techStack)))
-                .filter(item -> item.score() > 0)
-                .max(Comparator.comparingInt(ScoredErrorCase::score)
-                        .thenComparing(item -> -item.errorCase().id()))
-                .map(ScoredErrorCase::errorCase)
-                .orElse(null);
-    }
-
-    private int score(ErrorCase item, String input, String techStack) {
-        int score = 0;
-        for (String keyword : splitParts(item.keyword())) {
-            String normalizedKeyword = normalize(keyword);
-            if (!normalizedKeyword.isEmpty() && input.contains(normalizedKeyword)) {
-                score += 10;
-            }
+    public Evidence prepare(AnalyzeRequest request, Consumer<String> progress) {
+        validate(request);
+        progress.accept("正在检索候选案例");
+        var retrieval = retriever.retrieve(request.inputText(), request.techStack());
+        progress.accept("检索模式：" + retrieval.mode() + "，候选案例：" + retrieval.hits().size());
+        ErrorCase best = retrieval.hits().isEmpty() ? null : retrieval.hits().get(0).errorCase();
+        GraphResponse graph = new GraphResponse(List.of(), List.of());
+        String graphStatus = "未命中案例";
+        if (best != null) {
+            try {
+                graph = kg.graphByErrorId(best.id());
+                graphStatus = graph.nodes().isEmpty() ? "图谱暂无关联证据" : "已检索 1～3 跳图谱证据";
+            } catch (RuntimeException failure) { graphStatus = "图谱不可用，保留本地案例证据"; }
         }
-        if (!normalize(item.errorName()).isEmpty() && input.contains(normalize(item.errorName()))) {
-            score += 6;
-        }
-        if (score > 0 && !techStack.isEmpty() && normalize(item.component()).contains(techStack)) {
-            score += 3;
-        }
-        return score;
+        progress.accept(graphStatus);
+        return new Evidence(retrieval, best, graph, graphStatus);
     }
-
-    private String buildAdvice(ErrorCase item) {
-        return "当前阶段先使用知识库生成建议：优先检查“" + item.cause()
-                + "”，处理方式为“" + item.solution()
-                + "”。后续 Phase 4 会把该图谱检索结果交给大模型生成更完整的步骤化建议。";
+    public AnalyzeResponse analyze(AnalyzeRequest request) {
+        Evidence evidence = prepare(request, ignored -> {});
+        String advice = evidence.best() == null ? fallback(evidence)
+                : llm.generateAdvice(request, evidence.best(), evidence.graph());
+        return save(request, evidence, advice);
     }
-
-    private List<String> splitParts(String value) {
-        if (value == null || value.trim().isEmpty()) {
-            return List.of();
-        }
-        List<String> parts = new ArrayList<>();
-        for (String part : PART_SPLITTER.split(value)) {
-            String trimmed = part.trim();
-            if (!trimmed.isEmpty()) {
-                parts.add(trimmed);
-            }
-        }
-        return parts;
+    public AnalyzeResponse save(AnalyzeRequest request, Evidence evidence, String advice) {
+        ErrorCase c = evidence.best();
+        history.save(request, c == null ? null : c.id(), c == null ? null : c.errorName(), evidence.graph(), advice);
+        return new AnalyzeResponse(c != null, c == null ? null : c.id(), c == null ? null : c.errorName(),
+                c == null ? null : c.stage(), c == null ? request.techStack() : c.component(),
+                c == null ? List.of() : parts(c.symptom()), c == null ? List.of() : parts(c.cause()),
+                c == null ? List.of() : parts(c.solution()), c == null ? List.of() : parts(c.relatedFile()),
+                c == null ? List.of() : parts(c.relatedCommand()), evidence.graph(), advice,
+                "检索模式：" + evidence.retrieval().mode() + "；" + evidence.graphStatus());
     }
-
-    private String normalize(String value) {
-        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+    public static String fallback(Evidence evidence) {
+        ErrorCase c = evidence.best();
+        if (c == null) return "当前知识库未命中明确故障类型。请补充完整错误日志、技术栈版本、相关配置文件和复现步骤。";
+        return "【本地知识库建议】\n可能原因：" + c.cause() + "\n排查步骤：" + c.solution()
+                + "\n相关文件：" + c.relatedFile() + "\n排查命令：" + c.relatedCommand() + "\n风险提示：" + c.riskTip();
     }
-
-    private record ScoredErrorCase(ErrorCase errorCase, int score) {
+    private List<String> parts(String value) {
+        return value == null || value.isBlank() ? List.of() : java.util.Arrays.stream(value.split("[,;，；/]+"))
+                .map(String::trim).filter(s -> !s.isBlank()).toList();
     }
 }

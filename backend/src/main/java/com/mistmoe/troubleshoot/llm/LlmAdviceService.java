@@ -27,7 +27,10 @@ public class LlmAdviceService {
 
     public LlmAdviceService(LlmProperties properties) {
         this.properties = properties;
-        this.restClient = RestClient.create();
+        var factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000);
+        factory.setReadTimeout(30000);
+        this.restClient = RestClient.builder().requestFactory(factory).build();
     }
 
     public String generateAdvice(AnalyzeRequest request, ErrorCase errorCase, GraphResponse graph) {

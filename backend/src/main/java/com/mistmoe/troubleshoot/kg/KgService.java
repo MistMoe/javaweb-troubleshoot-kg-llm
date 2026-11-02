@@ -7,6 +7,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.mistmoe.troubleshoot.errorcase.ErrorCase;
@@ -35,7 +38,7 @@ public class KgService {
         this.errorCaseRepository = errorCaseRepository;
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(5000);
-        requestFactory.setReadTimeout(30000);
+        requestFactory.setReadTimeout(5000);
         this.restClient = RestClient.builder()
                 .baseUrl(httpUrl)
                 .requestFactory(requestFactory)
@@ -44,7 +47,7 @@ public class KgService {
         this.authorizationHeader = "Basic " + token;
     }
 
-    public KgImportResponse importFromMysql() {
+    public synchronized KgImportResponse importFromMysql() {
         List<ErrorCase> cases = errorCaseRepository.list(null, null, null);
         runStatements(List.of(
                 statement("CREATE CONSTRAINT error_mysql_id IF NOT EXISTS FOR (n:Error) REQUIRE n.mysqlId IS UNIQUE", Map.of()),
@@ -58,7 +61,35 @@ public class KgService {
         ));
 
         List<Map<String, Object>> statements = new ArrayList<>();
+        JsonNode existing = runStatements(List.of(statement(
+                "MATCH (e:Error) WHERE e.mysqlId IS NOT NULL RETURN e.mysqlId, e.fingerprint", Map.of())));
+        Map<Long, String> fingerprints = new LinkedHashMap<>();
+        for (JsonNode row : existing.path("results").path(0).path("data")) {
+            fingerprints.put(row.path("row").path(0).asLong(), row.path("row").path(1).asText(""));
+        }
+        List<Long> ids = cases.stream().map(ErrorCase::id).toList();
+        for (Long id : fingerprints.keySet()) {
+            if (!ids.contains(id)) {
+                statements.add(statement("""
+                        MATCH (e:Error {mysqlId: $id}) OPTIONAL MATCH p=(e)-[*1..3]->()
+                        UNWIND relationships(p) AS r
+                        WITH DISTINCT r WHERE r.caseId IS NULL OR r.caseId = $id DELETE r
+                        """, Map.of("id", id)));
+                statements.add(statement("MATCH ()-[r]->() WHERE r.caseId = $id DELETE r", Map.of("id", id)));
+                statements.add(statement("MATCH (e:Error {mysqlId: $id}) DETACH DELETE e", Map.of("id", id)));
+            }
+        }
         for (ErrorCase item : cases) {
+            String fingerprint = fingerprint(item);
+            if (fingerprint.equals(fingerprints.get(item.id()))) continue;
+            // Remove legacy paths and this case's owned edges, without deleting shared entities.
+            statements.add(statement("""
+                    MATCH (e:Error {mysqlId: $id})
+                    OPTIONAL MATCH p=(e)-[*1..3]->()
+                    UNWIND relationships(p) AS r
+                    WITH DISTINCT r WHERE r.caseId IS NULL OR r.caseId = $id DELETE r
+                    """, Map.of("id", item.id())));
+            statements.add(statement("MATCH ()-[r]->() WHERE r.caseId = $id DELETE r", Map.of("id", item.id())));
             Map<String, Object> params = new LinkedHashMap<>();
             params.put("id", item.id());
             params.put("errorName", item.errorName());
@@ -67,42 +98,50 @@ public class KgService {
             params.put("symptom", item.symptom());
             params.put("cause", item.cause());
             params.put("solution", item.solution());
+            params.put("fingerprint", fingerprint);
             statements.add(statement("""
                     MERGE (e:Error {mysqlId: $id})
-                    SET e.name = $errorName, e.keyword = $keyword
+                    SET e.name = $errorName, e.keyword = $keyword, e.fingerprint = $fingerprint
                     MERGE (stage:Stage {name: $stage})
                     MERGE (symptom:Symptom {name: $symptom})
                     MERGE (cause:Cause {name: $cause})
                     MERGE (solution:Solution {name: $solution})
-                    MERGE (e)-[:OCCURS_IN]->(stage)
-                    MERGE (e)-[:HAS_SYMPTOM]->(symptom)
-                    MERGE (e)-[:MAY_CAUSED_BY]->(cause)
-                    MERGE (cause)-[:SOLVED_BY]->(solution)
+                    MERGE (e)-[:OCCURS_IN {caseId: $id}]->(stage)
+                    MERGE (e)-[:HAS_SYMPTOM {caseId: $id}]->(symptom)
+                    MERGE (e)-[:MAY_CAUSED_BY {caseId: $id}]->(cause)
+                    MERGE (cause)-[:SOLVED_BY {caseId: $id}]->(solution)
                     """, params));
 
             for (String component : splitParts(item.component())) {
                 statements.add(statement("""
                         MATCH (e:Error {mysqlId: $id})
                         MERGE (component:Component {name: $name})
-                        MERGE (e)-[:RELATED_TO]->(component)
+                        MERGE (e)-[:RELATED_TO {caseId: $id}]->(component)
                         """, Map.of("id", item.id(), "name", component)));
             }
             for (String file : splitParts(item.relatedFile())) {
                 statements.add(statement("""
                         MATCH (solution:Solution {name: $solution})
                         MERGE (file:File {name: $name})
-                        MERGE (solution)-[:CHECK_FILE]->(file)
-                        """, Map.of("solution", item.solution(), "name", file)));
+                        MERGE (solution)-[:CHECK_FILE {caseId: $id}]->(file)
+                        """, Map.of("solution", item.solution(), "name", file, "id", item.id())));
             }
             for (String command : splitParts(item.relatedCommand())) {
                 statements.add(statement("""
                         MATCH (solution:Solution {name: $solution})
                         MERGE (command:Command {name: $name})
-                        MERGE (solution)-[:USE_COMMAND]->(command)
-                        """, Map.of("solution", item.solution(), "name", command)));
+                        MERGE (solution)-[:USE_COMMAND {caseId: $id}]->(command)
+                        """, Map.of("solution", item.solution(), "name", command, "id", item.id())));
             }
         }
-        runStatements(statements);
+        if (!statements.isEmpty()) {
+            statements.add(statement("""
+                    MATCH (n) WHERE any(label IN labels(n) WHERE label IN
+                    ['Stage','Component','Symptom','Cause','Solution','File','Command'])
+                    AND NOT (n)--() DELETE n
+                    """, Map.of()));
+            runStatements(statements);
+        }
         return new KgImportResponse(cases.size());
     }
 
@@ -110,9 +149,23 @@ public class KgService {
         JsonNode response = runStatements(List.of(statement("""
                 MATCH (e:Error {mysqlId: $errorId})
                 OPTIONAL MATCH path=(e)-[*1..3]->(n)
+                WHERE all(r IN relationships(path) WHERE r.caseId = $errorId OR r.caseId IS NULL)
                 RETURN path
+                LIMIT 200
                 """, Map.of("errorId", errorId), List.of("graph"))));
         return parseGraph(response);
+    }
+
+    static String fingerprint(ErrorCase item) {
+        try {
+            String text = java.util.stream.Stream.of(item.errorName(), item.stage(),
+                    item.component(), item.keyword(), item.symptom(), item.cause(), item.solution(),
+                    item.relatedFile(), item.relatedCommand(), item.riskTip())
+                    .map(v -> v == null ? "-1:" : v.length() + ":" + v).collect(java.util.stream.Collectors.joining());
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     public GraphResponse search(String keyword) {

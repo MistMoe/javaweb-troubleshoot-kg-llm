@@ -43,6 +43,7 @@
             <BrainCircuit :size="18" :stroke-width="1.6" />
             {{ analyzing ? '分析中...' : '开始智能分析' }}
           </button>
+          <button v-if="analyzing" class="action-button" type="button" @click="cancelAnalysis">停止分析</button>
         </el-form>
       </section>
 
@@ -87,7 +88,7 @@
         </div>
         <div v-if="analyzing" class="loading-state inset-well">
           <span></span>
-          <p>正在检索知识库、图谱和 LLM 建议...</p>
+          <p>{{ progressMessages.at(-1) || '正在检索知识库、图谱和模型建议...' }}</p>
         </div>
 
         <div v-if="result" class="result-content">
@@ -99,8 +100,8 @@
 
           <div class="metric-row">
             <div class="metric-plate">
-              <strong>{{ result.matched ? '86%' : '32%' }}</strong>
-              <span>匹配置信度</span>
+              <strong>{{ candidateCount }}</strong>
+              <span>候选案例</span>
             </div>
             <div class="metric-plate">
               <strong>{{ graphNodeCount }}</strong>
@@ -169,11 +170,14 @@
           </div>
           <Sparkles :size="18" :stroke-width="1.5" />
         </div>
-        <div v-if="!result" class="advice-empty inset-well">
+        <div v-if="progressMessages.length" class="inset-well" aria-live="polite">
+          <p v-for="(message, index) in progressMessages" :key="index">{{ message }}</p>
+        </div>
+        <div v-if="!result && !streamAdvice" class="advice-empty inset-well">
           <Sparkles :size="32" :stroke-width="1.25" />
           <p class="soft-text">等待一次分析后生成建议。</p>
         </div>
-        <div v-else class="advice-body inset-well">{{ result.aiAdvice }}</div>
+        <div v-else class="advice-body inset-well">{{ result?.aiAdvice || streamAdvice }}</div>
       </section>
     </div>
   </section>
@@ -181,7 +185,7 @@
 
 <script setup>
 import './analyze-view.css'
-import axios from 'axios'
+import { readSse } from '../../utils/sse'
 import * as echarts from 'echarts'
 import { BrainCircuit, FileDown, Network, Printer, Sparkles } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
@@ -200,6 +204,10 @@ const chartRef = ref(null)
 const chart = shallowRef(null)
 const analyzing = ref(false)
 const result = ref(null)
+const streamAdvice = ref('')
+const progressMessages = ref([])
+const candidateCount = ref(0)
+let streamController = null
 let stopChartResizeObserver = () => {}
 
 const form = reactive({
@@ -256,20 +264,44 @@ async function analyze() {
   }
 
   analyzing.value = true
+  result.value = null
+  streamAdvice.value = ''
+  progressMessages.value = []
+  candidateCount.value = 0
+  stopChartResizeObserver()
+  chart.value?.dispose()
+  chart.value = null
+  streamController = new AbortController()
+  const timeout = setTimeout(() => streamController?.abort(), 70000)
   try {
-    const response = await axios.post('/api/error/analyze', {
-      inputText: form.inputText,
-      techStack: form.techStack,
-      userId: props.currentUser?.id || 1
+    const response = await fetch('/api/error/analyze/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+      signal: streamController.signal,
+      body: JSON.stringify({ inputText: form.inputText, techStack: form.techStack, userId: props.currentUser?.id || 1 })
     })
-    result.value = response.data
+    await readSse(response, (event, data) => {
+      if (event === 'progress' || event === 'tool') progressMessages.value.push(data)
+      if (event === 'retrieval') candidateCount.value = data.hits.length
+      if (event === 'token') streamAdvice.value += data
+      if (event === 'reset') { streamAdvice.value = ''; progressMessages.value.push(data) }
+      if (event === 'result') result.value = data
+      if (event === 'failure') throw new Error(data)
+    })
+    if (!result.value) throw new Error('分析流已中断，未生成完整结果')
     await renderGraph()
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '分析失败，请确认后端、MySQL 和 Neo4j 已启动')
+    streamAdvice.value = ''
+    if (error.name === 'AbortError') progressMessages.value.push('分析已停止或超时，本次未收到完整结果')
+    else ElMessage.error(error.message || '分析失败，请确认后端已启动')
   } finally {
+    clearTimeout(timeout)
+    streamController = null
     analyzing.value = false
   }
 }
+
+function cancelAnalysis() { streamController?.abort() }
 
 function exportAnalyzeWord() {
   if (!result.value) return
@@ -348,6 +380,7 @@ async function renderGraph() {
 }
 
 onBeforeUnmount(() => {
+  cancelAnalysis()
   stopChartResizeObserver()
   chart.value?.dispose()
 })

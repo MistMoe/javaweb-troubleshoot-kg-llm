@@ -13,9 +13,19 @@ import org.springframework.web.bind.annotation.RestController;
 public class ErrorAnalysisController {
 
     private final ErrorAnalysisService errorAnalysisService;
+    private final AnalysisStreamService streams;
 
-    public ErrorAnalysisController(ErrorAnalysisService errorAnalysisService) {
+    public ErrorAnalysisController(ErrorAnalysisService errorAnalysisService, AnalysisStreamService streams) {
         this.errorAnalysisService = errorAnalysisService;
+        this.streams = streams;
+    }
+
+    @PostMapping(value = "/analyze/stream", produces = "text/event-stream")
+    public org.springframework.web.servlet.mvc.method.annotation.SseEmitter stream(
+            @RequestBody AnalyzeRequest request, jakarta.servlet.http.HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-cache, no-transform");
+        response.setHeader("X-Accel-Buffering", "no");
+        return streams.stream(request);
     }
 
     @PostMapping("/analyze")
